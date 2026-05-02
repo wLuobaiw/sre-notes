@@ -187,6 +187,79 @@ Git 需要识别你的身份，才能记录 “谁提交了代码”，配置分
     git config --list --show-origin
     ```
 
+## .gitignore 配置
+
+**核心概念**
+
+`.gitignore` 文件用于告诉 Git **忽略哪些文件**，让它们不被纳入版本管理。常见场景：编译产物、依赖包、日志文件、敏感配置等不应提交的文件。
+
+> 核心价值：保持仓库干净，避免误提交无关文件（如 `node_modules`、`.env`、`*.log` 等）。
+
+**忽略规则语法**
+
+| 语法               | 说明                                           | 示例                              |
+| :----------------- | :--------------------------------------------- | :-------------------------------- |
+| `*.后缀`            | 匹配所有同后缀文件                             | `*.log` 忽略所有日志文件          |
+| `**/目录/`          | 匹配任意层级下的指定目录                       | `**/node_modules/` 忽略所有嵌套的 node_modules |
+| `目录/`             | 匹配当前目录下的指定目录                       | `build/` 忽略 build 目录          |
+| `?`                | 匹配单个任意字符                               | `file?.txt` 匹配 file1.txt/fileA.txt |
+| `[abc]`            | 匹配括号内任意一个字符                         | `file[12].txt` 匹配 file1.txt/file2.txt |
+| `!`                | 取反，让匹配到的文件不被忽略（需先被忽略）     | `!important.log` 不忽略 important.log |
+
+**常用场景示例**
+
+- **Node.js 项目**：
+
+    ```
+    node_modules/
+    dist/
+    .env
+    *.log
+    npm-debug.log*
+    ```
+
+- **Python 项目**：
+
+    ```
+    __pycache__/
+    *.py[cod]
+    *.egg-info/
+    .venv/
+    venv/
+    .env
+    *.log
+    ```
+
+- **Java 项目**：
+
+    ```
+    target/
+    *.class
+    *.jar
+    *.war
+    .idea/
+    *.iml
+    ```
+
+- **通用（IDE / 系统文件）**：
+
+    ```
+    .vscode/
+    .idea/
+    *.swp
+    *.swo
+    *~
+    .DS_Store
+    Thumbs.db
+    ```
+
+> **注意**
+>
+> 1. `.gitignore` 文件本身应该被提交到版本库（团队共享忽略规则）
+> 2. 忽略规则**仅对未跟踪文件生效**——已经被 Git 跟踪的文件，即使写入 `.gitignore` 也仍会被管理，需先用 `git rm --cached` 取消跟踪
+> 3. 每个目录下都可以有各自的 `.gitignore`，规则从上到下逐级生效
+> 4. 全局忽略规则可配置 `git config --global core.excludesfile ~/.gitignore_global`
+
 ## 本地仓库（核心）
 
 **核心概念**
