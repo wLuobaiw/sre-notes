@@ -139,200 +139,6 @@ MinIO 节点本身不存储集群元数据。集群拓扑信息通过启动参�
 
 ---
 
-# 搭建部署
-
-
-
-## 单机部署
-
-单机模式主要用于开发测试，**不能做到高可用**
-
-### 二进制（Linux）
-
-以 `Linux x86_64` 为例
-
-```shell
-# 下载
-wget https://dl.min.io/server/minio/release/linux-amd64/minio
-chmod +x minio
-
-# 启动单机单盘模式（数据存储在 /data 目录）
-./minio server /data
-```
-
-启动后会输出 `Access Key` 和 `Secret Key`，以及访问地址 `http://IP:9000`
-
-**指定自定义凭证**：
-
-```shell
-MINIO_ROOT_USER=admin MINIO_ROOT_PASSWORD=admin123 ./minio server /data
-```
-
-### Docker
-
-```shell
-docker run -d \
-    -p 9000:9000 \
-    -p 9001:9001 \
-    -v /data:/data \
-    -e MINIO_ROOT_USER=minioadmin \
-    -e MINIO_ROOT_PASSWORD=minioadmin \
-    minio/minio server /data --console-address ":9001"
-```
-
-- `9000`：S3 API 端口
-- `9001`：Web 控制台端口
-- `/data`：数据存储目录
-
-### 单机多盘模式
-
-单机也可以用多块盘开启纠删码模式（用于测试纠删码特性）：
-
-```shell
-# 创建模拟目录
-mkdir -p /data/minio{1,2,3,4}
-
-# 启动（4 块盘，纠删码模式）
-./minio server /data/minio{1,2,3,4}
-```
-
-
-
-## 集群/分布式部署
-
-多节点 + 多磁盘联合工作，形成一个**统一的资源池**。
-数据通过纠删码跨节点分片，容忍节点和磁盘故障。
-新增节点后存储池扩大（通过新增 Erasure Set）。
-
-**关键点**：集群模式下，**必须保持所有节点的磁盘配置一致**（数量、顺序），不能某个节点少一块盘。
-
-### 部署前准备
-
-以下部署以 **4 节点，每节点 2 块盘** 为例
-
-假设四个节点 IP：`192.168.1.11 ~ 192.168.1.14`
-
-1. 在每个节点上创建数据目录：
-
-```shell
-# 每个节点执行
-mkdir -p /data/minio{1,2}
-```
-
-2. 确保所有节点时间同步（NTP），这对于 S3 签名验证至关重要。
-
-3. 如果是生产环境，建议使用独立的磁盘分区或裸盘，而非系统盘上的目录。
-
-### 方式一：二进制启动
-
-在每个节点上执行相同的命令：
-
-```shell
-./minio server \
-    http://192.168.1.11/data/minio{1,2} \
-    http://192.168.1.12/data/minio{1,2} \
-    http://192.168.1.13/data/minio{1,2} \
-    http://192.168.1.14/data/minio{1,2} \
-    --console-address ":9001"
-```
-
-> **关键**：每个节点上的启动命令**完全相同**，MinIO 会自动识别本机 IP，仅管理本机的磁盘。
-
-### 方式二：Docker Compose
-
-在管理节点上编写 `docker-compose.yml`：
-
-```yaml
-version: '3.8'
-
-services:
-  minio1:
-    image: minio/minio
-    container_name: minio1
-    hostname: minio1
-    restart: always
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    command: server http://minio{1...4}/data{1...2} --console-address ":9001"
-    volumes:
-      - /data/minio1-1:/data1
-      - /data/minio1-2:/data2
-    networks:
-      - minio-net
-
-  minio2:
-    image: minio/minio
-    container_name: minio2
-    hostname: minio2
-    restart: always
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    command: server http://minio{1...4}/data{1...2} --console-address ":9001"
-    volumes:
-      - /data/minio2-1:/data1
-      - /data/minio2-2:/data2
-    networks:
-      - minio-net
-
-  minio3:
-    image: minio/minio
-    container_name: minio3
-    hostname: minio3
-    restart: always
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    command: server http://minio{1...4}/data{1...2} --console-address ":9001"
-    volumes:
-      - /data/minio3-1:/data1
-      - /data/minio3-2:/data2
-    networks:
-      - minio-net
-
-  minio4:
-    image: minio/minio
-    container_name: minio4
-    hostname: minio4
-    restart: always
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    command: server http://minio{1...4}/data{1...2} --console-address ":9001"
-    volumes:
-      - /data/minio4-1:/data1
-      - /data/minio4-2:/data2
-    networks:
-      - minio-net
-
-networks:
-  minio-net:
-    driver: bridge
-```
-
-### 方式三：Kubernetes 部署
-
-MinIO 官方提供了 Helm Chart 和 Operator 两种方式在 Kubernetes 上部署：
-
-```shell
-# 使用 Helm 部署
-helm repo add minio https://charts.min.io/
-helm install minio minio/minio \
-    --set mode=distributed \
-    --set replicas=4 \
-    --set drivesPerNode=2 \
-    --set rootUser=minioadmin \
-    --set rootPassword=minioadmin
-```
-
-
-
----
-
 # 常用命令（mc 客户端）
 
 MinIO 主要使用其客户端（MinIO Client）也就是 `mc` 命令来进行操作
@@ -527,6 +333,200 @@ mc share download myminio/mybucket/localfile --expire 168h
 
 # 生成一个 1 小时有效的上传链接
 mc share upload myminio/mybucket/ --expire 1h
+```
+
+
+
+---
+
+# 搭建部署
+
+
+
+## 单机部署
+
+单机模式主要用于开发测试，**不能做到高可用**
+
+### 二进制（Linux）
+
+以 `Linux x86_64` 为例
+
+```shell
+# 下载
+wget https://dl.min.io/server/minio/release/linux-amd64/minio
+chmod +x minio
+
+# 启动单机单盘模式（数据存储在 /data 目录）
+./minio server /data
+```
+
+启动后会输出 `Access Key` 和 `Secret Key`，以及访问地址 `http://IP:9000`
+
+**指定自定义凭证**：
+
+```shell
+MINIO_ROOT_USER=admin MINIO_ROOT_PASSWORD=admin123 ./minio server /data
+```
+
+### Docker
+
+```shell
+docker run -d \
+    -p 9000:9000 \
+    -p 9001:9001 \
+    -v /data:/data \
+    -e MINIO_ROOT_USER=minioadmin \
+    -e MINIO_ROOT_PASSWORD=minioadmin \
+    minio/minio server /data --console-address ":9001"
+```
+
+- `9000`：S3 API 端口
+- `9001`：Web 控制台端口
+- `/data`：数据存储目录
+
+### 单机多盘模式
+
+单机也可以用多块盘开启纠删码模式（用于测试纠删码特性）：
+
+```shell
+# 创建模拟目录
+mkdir -p /data/minio{1,2,3,4}
+
+# 启动（4 块盘，纠删码模式）
+./minio server /data/minio{1,2,3,4}
+```
+
+
+
+## 集群/分布式部署
+
+多节点 + 多磁盘联合工作，形成一个**统一的资源池**。
+数据通过纠删码跨节点分片，容忍节点和磁盘故障。
+新增节点后存储池扩大（通过新增 Erasure Set）。
+
+**关键点**：集群模式下，**必须保持所有节点的磁盘配置一致**（数量、顺序），不能某个节点少一块盘。
+
+### 部署前准备
+
+以下部署以 **4 节点，每节点 2 块盘** 为例
+
+假设四个节点 IP：`192.168.1.11 ~ 192.168.1.14`
+
+1. 在每个节点上创建数据目录：
+
+```shell
+# 每个节点执行
+mkdir -p /data/minio{1,2}
+```
+
+2. 确保所有节点时间同步（NTP），这对于 S3 签名验证至关重要。
+
+3. 如果是生产环境，建议使用独立的磁盘分区或裸盘，而非系统盘上的目录。
+
+### 方式一：二进制启动
+
+在每个节点上执行相同的命令：
+
+```shell
+./minio server \
+    http://192.168.1.11/data/minio{1,2} \
+    http://192.168.1.12/data/minio{1,2} \
+    http://192.168.1.13/data/minio{1,2} \
+    http://192.168.1.14/data/minio{1,2} \
+    --console-address ":9001"
+```
+
+> **关键**：每个节点上的启动命令**完全相同**，MinIO 会自动识别本机 IP，仅管理本机的磁盘。
+
+### 方式二：Docker Compose
+
+在管理节点上编写 `docker-compose.yml`：
+
+```yaml
+version: '3.8'
+
+services:
+  minio1:
+    image: minio/minio
+    container_name: minio1
+    hostname: minio1
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server http://minio{1...4}/data{1...2} --console-address ":9001"
+    volumes:
+      - /data/minio1-1:/data1
+      - /data/minio1-2:/data2
+    networks:
+      - minio-net
+
+  minio2:
+    image: minio/minio
+    container_name: minio2
+    hostname: minio2
+    restart: always
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server http://minio{1...4}/data{1...2} --console-address ":9001"
+    volumes:
+      - /data/minio2-1:/data1
+      - /data/minio2-2:/data2
+    networks:
+      - minio-net
+
+  minio3:
+    image: minio/minio
+    container_name: minio3
+    hostname: minio3
+    restart: always
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server http://minio{1...4}/data{1...2} --console-address ":9001"
+    volumes:
+      - /data/minio3-1:/data1
+      - /data/minio3-2:/data2
+    networks:
+      - minio-net
+
+  minio4:
+    image: minio/minio
+    container_name: minio4
+    hostname: minio4
+    restart: always
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server http://minio{1...4}/data{1...2} --console-address ":9001"
+    volumes:
+      - /data/minio4-1:/data1
+      - /data/minio4-2:/data2
+    networks:
+      - minio-net
+
+networks:
+  minio-net:
+    driver: bridge
+```
+
+### 方式三：Kubernetes 部署
+
+MinIO 官方提供了 Helm Chart 和 Operator 两种方式在 Kubernetes 上部署：
+
+```shell
+# 使用 Helm 部署
+helm repo add minio https://charts.min.io/
+helm install minio minio/minio \
+    --set mode=distributed \
+    --set replicas=4 \
+    --set drivesPerNode=2 \
+    --set rootUser=minioadmin \
+    --set rootPassword=minioadmin
 ```
 
 
