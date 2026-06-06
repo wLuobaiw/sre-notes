@@ -12,6 +12,7 @@ SRE-Notes/
 ├── Git/            # 版本控制（含本地/远程仓库、分支、标签、钩子）
 ├── Python/         # Python 开发
 ├── MiddleWare/     # 中间件
+├── 算法/           # 数据结构与算法
 └── Agent/          # AI Agent & Skills
 ```
 
@@ -24,6 +25,7 @@ SRE-Notes/
 | **Kubernetes** | 架构概述、控制平面与工作节点、核心组件 |
 | **Git** | 三区模型（工作区/暂存区/版本库）、本地/远程仓库管理、分支/标签管理、Git 钩子自动化 |
 | **Python** | datetime 处理、字符串格式化、文件读写 |
+| **算法** | 基础数据结构（数组/链表/栈/队列/哈希表/树/堆）、核心算法（递归/排序/搜索）、进阶技巧（动态规划/滑动窗口/贪心/回溯）、自动机（DFA/NFA） |
 | **中间件** | ZooKeeper、Rancher、Nacos、ElasticSearch、MinIO |
 | **Agent** | AI Agent 发展历程、Skills 编写指南 |
 
